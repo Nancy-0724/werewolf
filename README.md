@@ -1,6 +1,6 @@
-# Werewolf Game — C-03 Role Strategy Engine
+# Werewolf Game — C-03.5 Advanced Reasoning
 
-12 人狼美人板 Web 專案。已完成 A-01～A-05、B Player View、Next.js Web Alpha、C-01 NPC Cognitive State、C-02 Heuristic Reasoning，以及 **C-03 Zero-cost Role Strategy Engine**。
+12 人狼美人板 Web 專案。已完成 A-01～A-05、B Player View、Next.js Web Alpha、C-01 NPC Cognitive State、C-02 Heuristic Reasoning，C-03 Zero-cost Role Strategy Engine，以及 **C-03.5 Five-layer Advanced Reasoning / World Hypothesis Engine**。
 
 目前產品形態：
 
@@ -14,6 +14,8 @@
 + NPC Persona / Memory / Belief / Claim / Decision History
 + deterministic C-02 heuristic reasoning
 + deterministic C-03 role strategy
++ C-03.5 identity / information / temporal / utility / world reasoning
++ constrained Top-8 world hypotheses
 + PostgreSQL / Neon-ready persistence
 + 0 OpenAI API 費用
 ```
@@ -32,6 +34,7 @@ B — Player View
   └──────────────→ C NPC Brain
                     ├─ C-01 Memory / Persona / Facts
                     ├─ C-02 Belief / Trust / Suspicion
+                    ├─ C-03.5 Advanced Reasoning / Worlds
                     └─ C-03 Role Strategy
                          │
                          ▼
@@ -71,6 +74,24 @@ C-03 把這些分析轉成角色行動：
 ```
 
 全部都是 deterministic TypeScript 規則，不呼叫 OpenAI、LLM、GPU 或外部推理服務。
+
+## C-03.5 新增：五層盤法 + 世界假設
+
+C-03.5 不把任何單一行為當成鐵邏輯，而是建立 soft evidence：
+
+```text
+① Identity Logic     行為放在不同身份下是否自然？
+② Information Logic 他公開上憑什麼知道這些？
+③ Temporal Logic    為什麼偏偏現在改口／站邊？
+④ Utility Logic     行為或死亡對誰有利？
+⑤ World Logic       哪組完整身份配置最能解釋目前資訊？
+```
+
+硬資訊（自己身份、合法狼隊知識、預言家私查、公開自爆／獵人）仍是 hard constraint。其餘全部只形成 evidence / hypothesis，不能升格成 SYSTEM_TRUTH。
+
+世界引擎使用受約束 Beam Search，不列舉全部 330 萬種身份配置。每個 NPC 最多保存 Top 8 worlds，並保留對跳角色的替代假設多樣性。C-03 使用世界 marginal 時只占約 25% 軟參考；C-02 hard fact 永遠優先。
+
+詳見 `docs/NPC_ADVANCED_REASONING.md`。
 
 ## 角色策略摘要
 
@@ -192,7 +213,7 @@ NPC 非權威腦內狀態：
 werewolf_npc_cognitive_states
 ```
 
-C-03 沿用 C-01 的 cognitive state JSON，因此**不需要新增 DB migration**。
+C-03/C-03.5 沿用 C-01 的 cognitive state JSON，因此**不需要新增 DB migration**。舊 C-03 cognitive JSON 若缺少 `advancedReasoning` 會自動補空白相容值。
 
 ## 技術基線
 
@@ -255,19 +276,23 @@ Web      8
 C-01    24
 C-02    24
 C-03    30
+C-03.5  28
 ------------
-Total  212
+Total  240
 ```
 
 本輪 delivery-external smoke：
 
 ```text
-C-01  24/24
-C-02  24/24
-C-03  30/30
+C-01    24/24
+C-02    24/24
+C-03    30/30
+C-03.5  28/28
+----------------
+NPC     106/106
 ```
 
-另以 Web memory-demo 建立多個不同真人座位的遊戲，C-03 NPC 可自動推進並停止在真人決策點。完整正式 Vitest / typecheck / Next build 仍由 GitHub Actions 執行，詳見 `docs/C03-report.md`。
+另以 Web memory-demo 建立 1 真人 + 11 NPC 遊戲，C-03.5 世界推理與 C-03 策略能自動推進並正常停止在真人決策點。正式 `npm install` 本輪 60 秒內仍無法完成外部套件下載，因此正式 Vitest / typecheck / Next build 仍由 GitHub Actions 執行，詳見 `docs/C035-report.md`。
 
 ## 主要目錄
 
@@ -278,13 +303,16 @@ src/projection/                   B — Player View
 src/npc/cognition/                C-01 memory / persona / cognitive state
 src/npc/reasoning/                C-02 heuristic reasoning
 src/npc/strategy/                 C-03 role strategy
+src/npc/advanced/                 C-03.5 five-layer / world reasoning
 src/npc/persistence/              NPC cognition persistence
 src/web/                          Web orchestration / C-03 NPC execution
 tests/npc/c01.test.ts             C-01 tests
 tests/npc/c02.test.ts             C-02 tests
 tests/npc/c03.test.ts             C-03 tests
+tests/npc/c035.test.ts            C-03.5 tests
 docs/NPC_ROLE_STRATEGY.md         C-03 contract
-docs/C03-report.md                C-03 implementation report
+docs/NPC_ADVANCED_REASONING.md    C-03.5 contract
+docs/C035-report.md               C-03.5 implementation report
 ```
 
 ## 下一階段

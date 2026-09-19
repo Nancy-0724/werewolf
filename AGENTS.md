@@ -56,3 +56,12 @@
 53. Wolf-team strategy may use only legally known packmates from PlayerView-derived exact knowledge. It may not infer hidden partners from SYSTEM_TRUTH.
 54. C-03 decisions are deterministic for the same PlayerView + cognitive state. No RNG, clock, network, LLM, or environment-dependent decision policy is allowed.
 55. Decision history may record PLANNED/COMMITTED/REJECTED strategy outcomes, but it never replaces the Core event stream as truth.
+56. C-03.5 five-layer reasoning is soft evidence, not a hidden rule oracle. No identity/information/timing/utility heuristic may promote an unsupported inference into a hard fact.
+57. World hypotheses must respect locked public role counts plus the NPC's legal hard knowledge. They may never use SYSTEM_TRUTH to prune worlds.
+58. Ordinary deaths do not reveal faction or role. Only rule-proof public events and legal private observations may create hard identity/faction constraints.
+59. Information-overreach, timing shifts, benefit analysis, bussing, and late counterclaims are low/medium-weight evidence with alternative explanations; never treat them as wolf-exclusive behavior.
+60. World search must remain bounded. Use constrained Beam Search and Top-K hypotheses rather than exhaustive identity enumeration.
+61. Competing role claims must preserve plausible alternative worlds when possible; Top-K diversity may not be faked by modifying their raw scores.
+62. C-03.5 world marginals may refine C-03 strategy only as a minority soft signal. Known faction/role facts always override contradictory hypotheses.
+63. Advanced reasoning must be deterministic and idempotent for identical PlayerView-derived cognition. No RNG, clock, network, LLM, or environment reads.
+64. Advanced cognition may persist evidence/world hypotheses but never action windowToken capabilities.
