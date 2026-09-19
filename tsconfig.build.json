@@ -1,5 +1,5 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.core.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
@@ -7,6 +7,6 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["tests"]
+  "include": ["src/core/**/*.ts", "src/projection/**/*.ts", "src/index.ts"],
+  "exclude": ["tests", "src/web"]
 }
