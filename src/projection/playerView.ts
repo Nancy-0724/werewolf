@@ -25,6 +25,8 @@ import {
   type ViewerIdentity,
 } from "./schemas.js";
 
+type ObservationWithoutOrdinal<T extends { ordinal: number }> = T extends unknown ? Omit<T, "ordinal"> : never;
+
 interface ProjectionCompilation {
   state: GameState;
   events: DomainEvent[];
@@ -60,13 +62,13 @@ function ability<K extends AbilityState["kind"]>(runtime: RuntimeState, kind: K)
   return runtime.abilityStates.find((entry): entry is Extract<AbilityState, { kind: K }> => entry.kind === kind) ?? null;
 }
 
-function privatePush(map: Map<string, PrivateObservation[]>, playerId: string, observation: Omit<PrivateObservation, "ordinal">): void {
+function privatePush(map: Map<string, PrivateObservation[]>, playerId: string, observation: ObservationWithoutOrdinal<PrivateObservation>): void {
   const current = map.get(playerId) ?? [];
   current.push({ ...observation, ordinal: current.length + 1 } as PrivateObservation);
   map.set(playerId, current);
 }
 
-function publicPush(list: PublicObservation[], observation: Omit<PublicObservation, "ordinal">): void {
+function publicPush(list: PublicObservation[], observation: ObservationWithoutOrdinal<PublicObservation>): void {
   list.push({ ...observation, ordinal: list.length + 1 } as PublicObservation);
 }
 
