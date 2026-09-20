@@ -1,0 +1,285 @@
+你正在協助開發一個支援真人、NPC及混合座位的狼人殺App。本次只實作A-01：可信遊戲資料核心的基礎，不做可玩遊戲、介面或NPC。
+
+【先讀文件】
+請先讀同工作區或附件中的 A_CORE_SPEC_v1.0.md。它是完整A層的規格；本prompt定義本次交付邊界。不要因為該文件提到後續功能就一併實作。
+若附件未提供，本prompt已包含A-01的必要契約，可先依本prompt完成A-01並在報告註明未讀到完整A規格；不可自行猜測後續技能規則。
+先檢查現有專案及package manager。既有檔案與未提交變更不得刪除覆蓋。若為空專案，依下列預設建立。
+
+【本次目標與停止點】
+建立可測試的TypeScript核心，完成：
+建局 → 配置12座位 → 一次隨機分配並鎖定角色 → 保存事件 → 匯出JSON → 匯入新store → 得到完全相同狀態。
+終點是GameState.status = LOCKED。不實作GameStarted、第一夜、技能、投票、AI或UI。
+另外支援HOST從LOBBY或LOCKED中止遊戲，保留原歷史。
+
+【技術預設】
+空專案：Node.js 24.x LTS、TypeScript strict、Zod runtime validation、Vitest、npm。
+安裝時查核相容的正式套件版本，使用確切版本並提交單一lockfile；不要使用未固定的latest或任意混用不同package manager。
+已有專案時沿用相容的package manager與環境，不另建競爭的lockfile，不擅自升級整個專案。相容性有障礙時列出實際錯誤，不假裝測試成功。
+開啟strict、noUncheckedIndexedAccess、exactOptionalPropertyTypes。
+提供等價於以下命令的scripts：
+- npm run typecheck：TypeScript檢查，不產生檔案。
+- npm test：一次執行全部測試，不進watch。
+- npm run build：編譯可用的核心套件。
+
+【禁止事項】
+不要建立React畫面、PWA、API route、登入、資料庫服務、LLM adapter、NPC、狼人殺技能handler、語音或多玩家網路。
+不要使用any、@ts-ignore、@ts-nocheck、不受控型別斷言來通過核心測試。
+不要把角色表硬編碼到正式抽牌流程。固定角色表只能出現在清楚標示的測試fixture。
+不要建立任意SetRole、PatchState、AppendEvent的玩家可呼叫接口。
+不要以空handler、空測試、只測mock自己、刪除失敗測試充當完成。
+不要自動進入A-02，不進行大規模順手重構。
+
+【建議目錄】
+空專案使用以下結構；既有專案可以等價調整，交付時說明映射。
+src/core/domain/          識別碼、schema、事件、state、錯誤碼、純reducer
+src/core/rulesets/        WB12_APP_v1的靜態角色與規則快照資料
+src/core/application/     command處理、可信身分、鎖牌service、依賴注入port
+src/core/infrastructure/  in-memory repository、Node隨機／時鐘／ID adapter
+src/core/serialization/   JSON匯入／匯出、schema檢查與重播驗證
+tests/core/              單元與整合測試
+docs/                    規格、architecture、DECISIONS、A01-report
+README.md
+AGENTS.md
+
+不要照檔案數量硬拆；保持依賴方向清楚：domain不能依賴UI、LLM、Node IO或infrastructure。
+
+【A-01固定板子】
+rulesetId: wolf-beauty-12.app
+rulesetVersion: 1.0.0
+engineContractVersion: 1.0.0
+
+角色定義與數量：
+WEREWOLF ×3，faction WOLF，victoryBucket WOLF。
+WOLF_BEAUTY ×1，faction WOLF，victoryBucket WOLF。
+SEER ×1，faction GOOD，victoryBucket GOD。
+WITCH ×1，faction GOOD，victoryBucket GOD。
+HUNTER ×1，faction GOOD，victoryBucket GOD。
+GUARD ×1，faction GOOD，victoryBucket GOD。
+VILLAGER ×4，faction GOOD，victoryBucket VILLAGER。
+每種roleVersion均為1.0.0。
+initialKnowledgePolicyId：兩種狼人為WOLF_TEAM_WITH_SPECIAL_ROLE，其餘角色為SELF_ROLE_ONLY；目前僅保存政策ID，不實作Player View。
+
+A-01只接受這個完整預設，不開放自訂角色、數量或房規。
+保留可擴充的schema及registry概念，但不要實作尚未存在的技能handler。
+此階段registry是「已知定義目錄」，不是宣稱技能已可執行；StartGame不在Command白名單內。
+
+【RulesetSnapshot精確資料契約】
+使用strict object與以下欄位，不塞任意metadata：
+- rulesetId、rulesetVersion、engineContractVersion：上面的固定值。
+- roleDefinitions：7筆 {roleId, roleVersion, displayName, factionId, victoryBucket, abilityRefs, initialKnowledgePolicyId}。
+- roleCounts：7筆 {roleId, count}，恰好符合上述數量，每roleId只能一筆。
+- abilityVersions：已引用能力的 {abilityId, version} 清單；version均1.0.0。
+- options：以下固定值的strict object。
+
+abilityRefs：
+WEREWOLF: [WOLF_CHAT, WOLF_KILL, SELF_EXPLODE]
+WOLF_BEAUTY: [WOLF_CHAT, WOLF_KILL, SELF_EXPLODE, CHARM, CHARM_DEATH_LINK]
+SEER: [SEER_CHECK]
+WITCH: [WITCH_KNIFE_INFO, WITCH_HEAL, WITCH_POISON]
+HUNTER: [HUNTER_SHOT]
+GUARD: [GUARD_PROTECT]
+VILLAGER: []
+
+options固定值：
+sheriffEnabled = true
+sheriffVoters = ORIGINAL_NON_CANDIDATES
+sheriffWithdrawalGrantsVote = false
+ordinaryVoteUnits = 2
+sheriffDayVoteUnits = 3
+maxPkRounds = 1
+ballotChangeAfterCommit = false
+witchKnifeInfoMode = WHILE_HEAL_REMAINS
+witchFirstNightSelfSave = true
+witchCanUseBothPotions = false
+witchCanPoisonSelf = false
+guardCanSelfGuard = true
+guardCanRepeatSameTarget = false
+guardHealCollision = KILL
+beautyCanCharmSelf = false
+beautyCanCharmWolf = true
+beautyCanRepeatTarget = true
+beautyPassKeepsPrevious = true
+beautyCanSelfExplode = true
+beautyDeathTriggersCharm = ALL_DEATHS
+hunterPoisonCanShoot = false
+hunterCharmCanShoot = false
+winCondition = ELIMINATE_SIDE
+winCheckpoint = RESOLUTION_GROUP_SETTLED
+simultaneousWin = DRAW
+ruleDetailsVersion = WB12_APP_1
+
+此快照是將來流程的宣告資料；A-01只驗證及保存，不執行技能。
+roleDefinitions與abilityVersions必須與固定目錄一致，不可讓輸入以相同roleId偽造faction、能力或版本。
+
+【識別碼、格式與State】
+ID使用非空不透明字串，不要用角色名稱構造玩家ID；seatNumber是1..12整數。
+序列化資料只能是JSON值；缺值用明確null，不使用undefined、NaN、Infinity、function、Map、Set、Date實例。
+時間是UTC ISO字串，來源由Clock port注入；順序以sequence判定。
+
+Seat = {playerId, seatNumber, displayName, controllerType: HUMAN | NPC}。
+必須驗證playerId唯一、seatNumber唯一且完整1..12，displayName去除前後空白後不可空白。
+controllerType不影響身份分配與遊戲規則。
+
+GameState必要欄位：
+gameId, status, createdAtIso, lastSequence, lobby, manifest, lockedSetup, runtime, abortReason。
+status在A-01只有LOBBY | LOCKED | ABORTED。
+
+LOBBY：lobby={seats, rulesetDraft}；初始seats=[]；manifest、lockedSetup、runtime=null；abortReason=null。
+LOCKED：lobby=null；manifest、lockedSetup有值；runtime=null；abortReason=null。
+ABORTED：保留前一狀態的lobby/manifest/lockedSetup，runtime仍null；abortReason=HOST_REQUEST。
+
+GameManifest：
+gameId, dataSchemaVersion="1.0.0", engineContractVersion="1.0.0", engineBuildId,
+createdAtIso, lockedAtIso, seatsSnapshot, rulesetSnapshot。
+engineBuildId由application配置注入；測試固定值，不用reducer讀git或環境。
+
+LockedSetup：
+assignments: 每玩家一筆 {playerId, assignedRoleId, assignedFactionId, victoryBucket, assignedAtSequence}。
+assignmentAudit: {randomAlgorithmId, privateSeed: string | null}。
+Node正式adapter可用crypto.randomInt，privateSeed=null；測試可使用可重現的假RNG。
+任何seed與assignments都屬SYSTEM_TRUTH，不公開。
+
+manifest與lockedSetup從SetupLocked寫入後永久固定。abort不得改它們。
+型別readonly只是第一層；還要schema檢查、輸入clone、不要返回可寫内部引用、必要的deep freeze與測試。
+
+【A-01 Commands與可信身分】
+對外傳入的command只能有：
+commandId, gameId, actorPlayerId:null, commandType, payload, windowToken:null。
+本次只有host命令；玩家階段在後續才做。
+
+Command union：
+CreateGame: payload={rulesetSnapshot}
+ConfigureSeats: payload={seats}
+LockGame: payload={}
+AbortGame: payload={reason: HOST_REQUEST}
+
+可信上下文TrustedPrincipal另外由內部入口提供：HOST(hostId)或PLAYER(playerId)。
+四種A-01命令只有HOST可用；測試PLAYER被拒絕。
+不得信任command payload偽造source=SYSTEM或principal；strict schema拒絕額外欄位。
+這是內部授權契約測試，不代表已做網路驗證或帳號登入。
+
+CreateGame：該gameId尚不存在；建立LOBBY。
+ConfigureSeats：只能LOBBY；一次完整替換合法12席。
+LockGame：只能LOBBY且已有合法12席；建立固定角色multiset並洗牌，按座號映射到playerId；一次SetupLocked事件鎖定manifest與assignments。
+AbortGame：LOBBY/LOCKED可用，變ABORTED；ABORTED後除同ID重送外任何新命令拒絕。
+
+【A-01 Event union】
+只實作以下4種，不建立後續事件的空處理分支：
+GameCreated payload={createdAtIso, rulesetDraft}
+SeatsConfigured payload={seats}
+SetupLocked payload={manifest, lockedSetup}
+GameAborted payload={reason: HOST_REQUEST}
+
+EventEnvelope：
+eventId, gameId, sequence, eventType, eventVersion="1.0.0", transactionId,
+causationCommandId, causedByEventIds:[], phaseId:null, recordedAtIso,
+audience:{kind:SYSTEM_TRUTH}, payload。
+
+A-01全部事件均視為truth stream，不做公開端點。不要因Seats看似公開就暴露原始log。
+sequence自1起連續，每局不得重複。eventId同局唯一。
+SetupLocked的assignedAtSequence必須等於自身事件sequence。
+
+所有schema使用strict物件，unknown input先parse才進domain；未知eventType、eventVersion、欄位或非法轉移須失敗，不可忽略。
+用discriminated union與窮盡檢查，不能default: return state吞掉未知事件。
+
+【純Reducer與重播】
+提供等價函式：reduceEvent(state: GameState | null, event) → 新GameState，replay(events) → GameState。
+初始state=null，只能接GameCreated。
+驗證gameId、sequence、事件版本、階段轉移、所有座位和角色分配及鎖定不變條件。
+不修改傳入state/event；不重新抽牌、不讀當前時間、不使用Math.random、不呼叫外部服務。
+replay無事件明確回無遊戲狀態，不虛構gameId。
+
+【Random、Clock、ID ports】
+RNG port提供randomInt(exclusiveUpperBound)與algorithmId/privateSeed audit。
+使用正確界限的Fisher–Yates洗牌；validate隨機源輸出為合法整數，非法時整筆LockGame失敗。
+production adapter採Node crypto.randomInt；測試注入固定序列RNG，不要求測試隨機結果碰巧不同。
+role RNG不與未來public order或NPC randomness混用。
+reducer/replay永不呼叫任何port。ID及timestamp在事件建立時由application決定。
+
+【Repository與冪等】
+使用InMemoryGameRepository；可操作多個gameId，彼此隔離。
+Repository內部保存events及成功command receipts，不以state當唯一真相。
+
+CommandReceipt = {
+commandId, gameId, principalKey, canonicalRequest,
+firstSequence, lastSequence, outcomeCode
+}。
+outcomeCode對應GAME_CREATED / SEATS_CONFIGURED / SETUP_LOCKED / GAME_ABORTED。
+canonicalRequest是可比較的已驗證請求表示，物件鍵順序不同不應造成誤判。
+
+處理順序：驗證trusted principal → 找receipt → 同ID同內容回原receipt → 同ID不同內容拒絕 → 載入state → 驗證業務規則 → 建立事件 → 原子append。
+只有成功請求需要receipt；失敗命令不得新增domain event。
+
+append(expectedSequence, eventsBatch, receipt)必須全部成功或全部失敗。
+先完整驗證到暫存副本，才替換store內容。若sequence、schema或receipt任一錯誤，原store不得變。
+同commandId同內容重送，即使state之後已前進，也回原成功receipt；不重抽角色、不新增event。
+相同commandId不同payload或不同principal，拒絕COMMAND_ID_REUSED。
+兩個寫入使用同expectedSequence，最多一個不同操作能成功；另一個回CONCURRENCY_CONFLICT。
+不要把同commandId重送與不同commandId重複LockGame混為一談；後者应回GAME_ALREADY_LOCKED。
+
+【匯出匯入】
+exportBundle(gameId) → JSON string。
+importBundle(json) → 新的或指定空gameId的repository資料；不得覆寫已有局。
+格式：{formatVersion:"1.0.0", gameId, events, commandReceipts}。
+不把snapshot當必要項。匯入要完整parse、驗證、重播到暫存，再一次保存。
+檢查events的gameId、連續sequence、eventId唯一、合法state transition、receipt對應command與sequence範圍。
+檢查receipt principal與canonicalRequest形狀；receipt範圍涵蓋的事件causationCommandId必須相符，不得跨到別人的交易。
+每個成功command transaction必須有對應receipt；禁止重複receipt commandId。A-01每command恰有一個事件。
+receipt中的commandType必須對應正確事件類型；CreateGame/ConfigureSeats/AbortGame的canonicalRequest payload須與事件內容相符，LockGame只允許空payload。
+
+匯入後重送已成功的LockGame，仍需回原receipt，不新增事件。
+明確標示export是開發／truth備份格式，不是普通玩家或觀戰API。
+記憶體+手動JSON恢復不等於已完成自動持久化；README不可宣稱已可抗當機自動恢復。
+
+【最少錯誤碼】
+INVALID_INPUT, UNAUTHORIZED, GAME_NOT_FOUND, GAME_ALREADY_EXISTS,
+INVALID_SEATS, UNSUPPORTED_RULESET, GAME_ALREADY_LOCKED, INVALID_PHASE,
+GAME_ABORTED, COMMAND_ID_REUSED, CONCURRENCY_CONFLICT,
+INVALID_EVENT_STREAM, UNSUPPORTED_EVENT_VERSION, INVALID_RANDOM_SOURCE。
+錯誤可帶可讀訊息；不可用throw後吞掉或靜默成功代替。
+
+【必須新增並真正執行的測試】
+以下每項至少一個實質案例；可合理合併共用fixture，不可跳過斷言。
+T01 合法建局→配置→鎖局，停在LOCKED，runtime=null。
+T02 角色總數12、WOLF4、GOD4、VILLAGER4，逐角色數量正確。
+T03 HUMAN/NPC混合座位完整保存，不影響角色multiset。
+T04 少人、多人、重複playerId、重複seatNumber、空白name、非法controllerType拒絕。
+T05 未配置座位不能鎖局；不能用玩家principal執行HOST命令。
+T06 未知ruleset、角色、roleVersion、偽造faction/能力、未支援options拒絕。
+T07 鎖局後ConfigureSeats與第二個不同ID的LockGame拒絕，assignments不變。
+T08 mutation測試：修改原始seats/ruleset輸入不改內部state。
+T09 mutation測試：修改讀出的state、assignments、匯出物件不改內部state。
+T10 同commandId同內容重送建局/鎖局只產生一份事件，RNG不被再次呼叫。
+T11 同commandId不同payload或principal拒絕。
+T12 所有event sequence與eventId正確；跨gameId資料隔離。
+T13 矛盾／跳號／重複事件或未知eventType/version重播拒絕。
+T14 reduce/replay不改傳入物件，多次replay同一log完全一致。
+T15 spy或注入驗證replay不呼叫RNG、Clock、ID port。
+T16 固定測試RNG產生可重現分配；非法RNG輸出拒絕且無部分寫入。
+T17 原子append：batch中有非法事件或receipt時零寫入。
+T18 並行或模擬競爭append相同expectedSequence，不產生雙寫或重複sequence。
+T19 JSON round-trip到全新store後state完全相同。
+T20 匯入後重送舊LockGame仍回原receipt、不重抽、不新增事件。
+T21 匯入損毀log、跨局receipt、缺receipt、重複receipt拒絕，不污染既有store。
+T22 AbortGame保留已鎖身份；ABORTED後新命令拒絕，同ID重送仍成功。
+T23 偽造SetRole/PatchState/StartGame、payload多餘SYSTEM字段等未知命令拒絕。
+T24 核心輸出可以JSON序列化，不含undefined/NaN/Map/Set或function。
+
+【AGENTS.md必須記錄的長期規則】
+角色只能SetupLocked分配一次；state只由事件推導；truth不能給NPC或公用UI；發言不是身份認證；不跳milestone；每次修改要測試；不得假報PASS。
+
+【交付與報告】
+實作前簡短說明你觀察到的專案狀態與本次檔案規劃，然後完成本次任務，不只回一份計畫。
+交付至少：實際程式與測試、README、AGENTS.md、docs/architecture.md、docs/DECISIONS.md、docs/A01-report.md。
+在A01-report.md記錄：
+1. A-01已做／未做，尤其無UI、无NPC、未實作技能與自動持久化。
+2. 修改檔案列表與核心架構。
+3. 實際Node與相依套件版本。
+4. 每項T01..T24對應測試檔／案例；執行命令、exit code、測試數量與結果。
+5. typecheck、test、build的實際結果與所有失敗原文。
+6. 與規格差異、仍有風險或未完成項目。
+7. 可供review的核心diff：schemas、reducer、command handler、repository、tests。
+
+必須實際執行typecheck、test、build。環境不能執行時，明確標示「未執行」，給出原因與所需命令；禁止聲稱全部通過。
+不要宣稱已完成狼人殺App、全部A層、Player View防洩漏或NPC獨立思考。
+完成後停下，不開發A-02。
