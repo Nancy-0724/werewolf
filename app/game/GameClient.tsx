@@ -182,7 +182,12 @@ export function GameClient() {
   async function post(path: string, body?: unknown) {
     setBusy(true); setError(null);
     try {
-      const response = await fetch(path, { method: "POST", headers: body === undefined ? undefined : { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+      const init: RequestInit = { method: "POST" };
+      if (body !== undefined) {
+        init.headers = { "Content-Type": "application/json" };
+        init.body = JSON.stringify(body);
+      }
+      const response = await fetch(path, init);
       const data = await response.json() as Envelope & { error?: { message?: string } };
       if (!response.ok) throw new Error(data.error?.message ?? "操作失敗");
       setEnvelope(data);
@@ -193,7 +198,7 @@ export function GameClient() {
   const view = envelope?.view ?? null;
   const timeline = useMemo(() => view ? view.public.timeline.slice(-18).reverse() : [], [view]);
 
-  if (!view) return <section className="panel loading-panel">{busy ? "載入遊戲中…" : <><p>{error ?? "找不到目前遊戲"}</p><Link className="primary-button" href="/new-game">建立新遊戲</Link></>}</section>;
+  if (!envelope || !view) return <section className="panel loading-panel">{busy ? "載入遊戲中…" : <><p>{error ?? "找不到目前遊戲"}</p><Link className="primary-button" href="/new-game">建立新遊戲</Link></>}</section>;
 
   return (
     <>

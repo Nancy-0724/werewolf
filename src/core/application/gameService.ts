@@ -828,7 +828,7 @@ export class GameService {
         if (command.payload.mode === "SPEAK") planner.append({ eventType: "SpeechPublished", payload: { speakerPlayerId: command.actorPlayerId, sessionId: session.sessionId, text: command.payload.text, source: command.payload.source, publishedAtSequence: (planner.state?.lastSequence ?? 0) + 1 } }, phaseId, { kind: "PUBLIC" });
         planner.append({ eventType: "SpeechFinished", payload: { speakerPlayerId: command.actorPlayerId, sessionId: session.sessionId } }, phaseId, { kind: "PUBLIC" });
         const afterSpeech = planner.state; const afterRuntime = afterSpeech?.runtime; const afterSession = afterRuntime?.speechSession;
-        if (afterSpeech === null || afterRuntime === null || afterRuntime === undefined || afterSession === null) throw new CoreError("INVALID_PHASE", "Missing speech state");
+        if (afterSpeech === null || afterRuntime === null || afterRuntime === undefined || afterSession == null) throw new CoreError("INVALID_PHASE", "Missing speech state");
         if (afterSession.status === "CLOSED") {
           const kind = afterSession.kind;
           closeSimplePhase(planner);
@@ -865,7 +865,7 @@ export class GameService {
         const phaseId = runtime.phase.phaseId;
         planner.append({ eventType: "SheriffSignupCommitted", payload: { actorPlayerId: command.actorPlayerId, join: command.payload.join, sessionId: session.sessionId } }, phaseId);
         const after = planner.state; const afterRuntime = after?.runtime; const afterSession = afterRuntime?.sheriff.signupSession;
-        if (after === null || afterRuntime === null || afterRuntime === undefined || afterSession === null) throw new CoreError("INVALID_PHASE", "Missing signup state");
+        if (after === null || afterRuntime === null || afterRuntime === undefined || afterSession == null) throw new CoreError("INVALID_PHASE", "Missing signup state");
         if (afterSession.committedPlayerIds.length === afterSession.eligiblePlayersSnapshot.length) {
           const candidates = seatOrdered(after, afterSession.joinedPlayerIds);
           const voters = seatOrdered(after, afterSession.eligiblePlayersSnapshot.filter((id) => !candidates.includes(id)));
@@ -884,7 +884,7 @@ export class GameService {
         const phaseId = runtime.phase.phaseId;
         planner.append({ eventType: "SheriffWithdrawalCommitted", payload: { actorPlayerId: command.actorPlayerId, withdraw: command.payload.withdraw, sessionId: session.sessionId } }, phaseId);
         const after = planner.state; const afterRuntime = after?.runtime; const afterSession = afterRuntime?.sheriff.withdrawalSession;
-        if (after === null || afterRuntime === null || afterRuntime === undefined || afterSession === null) throw new CoreError("INVALID_PHASE", "Missing withdrawal state");
+        if (after === null || afterRuntime === null || afterRuntime === undefined || afterSession == null) throw new CoreError("INVALID_PHASE", "Missing withdrawal state");
         if (afterSession.committedPlayerIds.length === afterSession.candidatePlayersSnapshot.length) {
           const remaining = seatOrdered(after, afterSession.candidatePlayersSnapshot.filter((id) => !afterSession.withdrawnPlayerIds.includes(id)));
           planner.append({ eventType: "SheriffWithdrawalSessionClosed", payload: { sessionId: afterSession.sessionId, remainingCandidatePlayerIds: remaining } }, phaseId);
@@ -900,7 +900,7 @@ export class GameService {
         const phaseId = runtime.phase.phaseId;
         planner.append({ eventType: "BallotCommitted", payload: { voterPlayerId: command.actorPlayerId, targetPlayerId: command.payload.targetPlayerId, sessionId: session.sessionId } }, phaseId);
         const after = planner.state; const afterRuntime = after?.runtime; const afterSession = afterRuntime?.voteSession;
-        if (after === null || afterRuntime === null || afterRuntime === undefined || afterSession === null) throw new CoreError("INVALID_PHASE", "Missing vote state");
+        if (after === null || afterRuntime === null || afterRuntime === undefined || afterSession == null) throw new CoreError("INVALID_PHASE", "Missing vote state");
         if (afterSession.ballots.length === afterSession.eligibleVotersSnapshot.length) {
           const result = computeVoteResult(afterSession.eligibleTargetsSnapshot, afterSession.weightUnitsByVoter, afterSession.ballots);
           planner.append({ eventType: "VoteSessionResolved", payload: { sessionId: afterSession.sessionId, result, ballots: afterSession.ballots } }, phaseId, { kind: "PUBLIC" });
