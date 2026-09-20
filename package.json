@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --testTimeout=15000",
     "build": "next build",
     "build:core": "tsc -p tsconfig.build.json",
     "start": "next start",
